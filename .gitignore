@@ -1,0 +1,6 @@
+/.idea/
+/deleted/
+/tests/test_db/*
+__pycache__/
+
+!/tests/test_db/.gitkeep
