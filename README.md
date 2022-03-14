@@ -36,7 +36,7 @@ from hot_shelve import FlatShelve
 # a database is a file with extension `.db`.
 db = FlatShelve('path/to/db.db')
 
-# add a immutable key-value pair
+# add an immutable key-value pair
 # ==============================
 db['name'] = 'Bob'
 
@@ -95,6 +95,7 @@ db.clear()  # -> {}
 
 ...
 
+db.close()
 ```
 
 ## Advanced Usages
