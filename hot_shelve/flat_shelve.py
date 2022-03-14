@@ -185,13 +185,14 @@ class FlatShelve:
         flat_key = '.'.join(key_chain)
         
         if type(node) is dict:
-            return DictNode(self, flat_key, node)
+            return DictNode(self, node, key_chain, node)
         elif node[0] == 0:
             return self._flat_db[flat_key]
         else:
             return (
-                ListNode(self, flat_key, node[1]) if node[1] is list else
-                SetNode(self, flat_key, node[1])
+                ListNode(self, node, key_chain, node[1])
+                if node[1] is list else
+                SetNode(self, node, key_chain, node[1])
             )
     
     def _pop_node(self, node: T.Node, key_chain: T.KeyChain,
@@ -211,14 +212,15 @@ class FlatShelve:
     def _node_values(self, node: T.Node, key_chain: T.KeyChain):
         for key, value in node.items():
             if isinstance(value, dict):
-                yield DictNode(self, key, value)
+                yield DictNode(self, value, key_chain + [key], value)
             elif value[0] == 0:
                 flat_key = '.'.join(key_chain + [key])
                 yield self._flat_db[flat_key]
             else:
                 yield (
-                    ListNode(self, key, value[1]) if value[1] is list else
-                    SetNode(self, key, value[1])
+                    ListNode(self, node, key_chain, value[1])
+                    if value[1] is list else
+                    SetNode(self, node, key_chain, value[1])
                 )
     
     def _node_items(self, node: T.Node, key_chain: T.KeyChain):
@@ -324,82 +326,88 @@ class FlatShelve:
 
 class MutableNode:
     
-    def __init__(self, root: FlatShelve,
-                 flat_key: T.FlatKey,
+    def __init__(self,
+                 root: FlatShelve,
+                 node: T.Node,
+                 key_chain: T.KeyChain,
                  mutable: T.Mutable):
-        assert flat_key
         self._root = root
-        self._key = flat_key
+        self._node = node
+        self._key_chain = key_chain
         self._value = mutable
 
 
+# noinspection PyProtectedMember
 class DictNode(MutableNode):
-    """ dict-like object. """
+    """ dict-like object.
     
-    def __init__(self, root, flat_key, mutable):
-        super().__init__(root, flat_key, mutable)
-        self._node = self._value
-        self._key_chain = self._key.split('.')
+    note: in DictNode, `self._value` is same as `self._node`. we prefer to use
+        `self._node` to avoid confusion.
+    """
+    
+    # (sort methods by alphabetical order.)
     
     def __contains__(self, key):
-        return key in self._value
+        return key in self._node
     
     def __getitem__(self, key):
-        return self._root[self._key + '.' + key]
+        return self._root._get_node(
+            self._node, self._key_chain,
+            key, default=KeyError
+        )
     
     def __iter__(self):
-        return iter(self._value)
+        return iter(self._node)
     
     def __len__(self):
-        return len(self._value)
+        return len(self._node)
     
     def __setitem__(self, key, value):
-        # noinspection PyProtectedMember
-        self._root._set_node(self._value, self._key_chain, key, value)
-        # self._root[self._key + '.' + key] = value
+        self._root._set_node(self._node, self._key_chain, key, value)
     
     def __str__(self):
-        # noinspection PyProtectedMember
-        return str(self._root._instantiate(self._value, self._key.split('.')))
+        return str(self._root._instantiate(self._node, self._key_chain))
     
     def clear(self):
-        self._value.clear()
-        self._root.pop(self._key)
+        self._node.clear()
+        self._root.pop('.'.join(self._key_chain))
     
     def get(self, key, default=None):
-        return self._root.get(self._key + '.' + key, default)
+        return self._root._get_node(self._node, self._key_chain, key, default)
     
     def items(self):
-        # noinspection PyProtectedMember
-        return self._root._node_items(self._value, self._key.split('.'))
+        return self._root._node_items(self._node, self._key_chain)
     
     def keys(self):
-        # noinspection PyProtectedMember
-        return self._root._node_keys(self._value)
+        return self._root._node_keys(self._node)
     
     def pop(self, key, default=None):
-        return self._root.pop(self._key + '.' + key, default)
+        return self._root._pop_node(self._node, self._key_chain, key, default)
     
     def popitem(self):
-        key, _ = self._value.popitem()
-        self._value[key] = None
-        return key, self._root.pop(self._key + '.' + key)
+        key, _ = self._node.popitem()
+        self._node[key] = (0, None)
+        return key, self.pop(key)
     
     def setdefault(self, key, default=None):
-        return self._root.setdefault(self._key + '.' + key, default)
+        if key in self._node:
+            return self[key]
+        else:
+            self[key] = default
+            return self[key]
     
     def update(self, other: dict):
         for k, v in other.items():
             self[k] = v
     
     def values(self):
-        # noinspection PyProtectedMember
-        return self._root._node_values(self._value, self._key.split('.'))
+        return self._root._node_values(self._node, self._key_chain)
 
 
 class ListNode(MutableNode):
-    _node: list
-    pass
+    
+    def append(self, value):
+        self._value.append(value)
 
 
 class SetNode(MutableNode):
