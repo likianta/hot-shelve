@@ -1,14 +1,9 @@
-import builtins
 import json
 import shelve
 from os.path import exists
 from typing import Any
 from typing import Iterator
 from typing import Union
-
-# to avoid `NameError: name 'open' is not defined` when calling
-# `FlatShelve.close`.
-_open = builtins.open
 
 
 class T:
@@ -49,7 +44,7 @@ class FlatShelve:
         
         self._flat_db = shelve.open(self._file)
         if exists(self._file_map):
-            with _open(self._file_map) as f:
+            with open(self._file_map) as f:
                 self._key_map = json.load(f)
         else:
             self._key_map = {}
@@ -150,7 +145,7 @@ class FlatShelve:
                 #       key, flat_key)
                 self._flat_db.pop(flat_key)
             node.pop(key)
-            
+        
         def recurse(node: T.Node, key: T.Key, value: T.Value):
             if isinstance(value, dict):
                 next_node = node[key] = {}
@@ -180,8 +175,10 @@ class FlatShelve:
         if default is not KeyError and key not in node:
             return default
         
+        parent_node = node
+        parent_key_chain = key_chain
         node = node[key]
-        key_chain.append(key)
+        key_chain = key_chain + [key]
         flat_key = '.'.join(key_chain)
         
         if type(node) is dict:
@@ -189,10 +186,11 @@ class FlatShelve:
         elif node[0] == 0:
             return self._flat_db[flat_key]
         else:
+            real_value = self._flat_db[flat_key]
             return (
-                ListNode(self, node, key_chain, node[1])
+                ListNode(self, parent_node, parent_key_chain, key, real_value)
                 if node[1] is list else
-                SetNode(self, node, key_chain, node[1])
+                SetNode(self, parent_node, parent_key_chain, key, real_value)
             )
     
     def _pop_node(self, node: T.Node, key_chain: T.KeyChain,
@@ -217,10 +215,12 @@ class FlatShelve:
                 flat_key = '.'.join(key_chain + [key])
                 yield self._flat_db[flat_key]
             else:
+                flat_key = '.'.join(key_chain + [key])
+                real_value = self._flat_db[flat_key]
                 yield (
-                    ListNode(self, node, key_chain, value[1])
+                    ListNode(self, node, key_chain, key, real_value)
                     if value[1] is list else
-                    SetNode(self, node, key_chain, value[1])
+                    SetNode(self, node, key_chain, key, real_value)
                 )
     
     def _node_items(self, node: T.Node, key_chain: T.KeyChain):
@@ -318,7 +318,7 @@ class FlatShelve:
     
     def close(self):
         self._flat_db.close()
-        with _open(self._file_map, 'w') as f:
+        with open(self._file_map, 'w') as f:
             json.dump(self._key_map, f)
 
 
@@ -404,12 +404,145 @@ class DictNode(MutableNode):
         return self._root._node_values(self._node, self._key_chain)
 
 
+# noinspection PyProtectedMember
 class ListNode(MutableNode):
+    _value: list
+    
+    def __init__(self,
+                 root: FlatShelve,
+                 parent_node: T.Node,
+                 parent_key_chain: T.KeyChain,
+                 current_key: T.Key,
+                 mutable: T.Mutable):
+        super().__init__(root, parent_node, parent_key_chain, mutable)
+        self._current_key = current_key
     
     def append(self, value):
         self._value.append(value)
+        self._refresh_root()
+    
+    def clear(self):
+        self._value.clear()
+        self._refresh_root()
+    
+    def copy(self):
+        return self._value.copy()
+    
+    def count(self, value):
+        return self._value.count(value)
+    
+    def extend(self, iterable):
+        self._value.extend(iterable)
+        self._refresh_root()
+    
+    def index(self, value, start=0, stop=None):
+        return self._value.index(value, start, stop)
+    
+    def insert(self, index: int, value):
+        self._value.insert(index, value)
+        self._refresh_root()
+    
+    def pop(self, index=-1):
+        value = self._value.pop(index)
+        self._refresh_root()
+        return value
+    
+    def remove(self, value):
+        self._value.remove(value)
+        self._refresh_root()
+    
+    def reverse(self):
+        self._value.reverse()
+        self._refresh_root()
+    
+    def sort(self, key=None, reverse=False):
+        self._value.sort(key=key, reverse=reverse)
+        self._refresh_root()
+    
+    def _refresh_root(self):
+        self._root._set_node(
+            self._node, self._key_chain,
+            self._current_key, self._value
+        )
 
 
+# noinspection PyProtectedMember
 class SetNode(MutableNode):
-    _node: set
-    pass
+    _value: set
+    
+    def __init__(self,
+                 root: FlatShelve,
+                 parent_node: T.Node,
+                 parent_key_chain: T.KeyChain,
+                 current_key: T.Key,
+                 mutable: T.Mutable):
+        super().__init__(root, parent_node, parent_key_chain, mutable)
+        self._current_key = current_key
+    
+    def add(self, value):
+        self._value.add(value)
+        self._refresh_root()
+    
+    def clear(self):
+        self._value.clear()
+        self._refresh_root()
+    
+    def copy(self):
+        return self._value.copy()
+    
+    def difference(self, *args):
+        return self._value.difference(*args)
+    
+    def difference_update(self, *args):
+        self._value.difference_update(*args)
+        self._refresh_root()
+    
+    def discard(self, value):
+        self._value.discard(value)
+        self._refresh_root()
+    
+    def intersection(self, *args):
+        return self._value.intersection(*args)
+    
+    def intersection_update(self, *args):
+        self._value.intersection_update(*args)
+        self._refresh_root()
+    
+    def isdisjoint(self, other):
+        return self._value.isdisjoint(other)
+    
+    def issubset(self, other):
+        return self._value.issubset(other)
+    
+    def issuperset(self, other):
+        return self._value.issuperset(other)
+    
+    def pop(self):
+        value = self._value.pop()
+        self._refresh_root()
+        return value
+    
+    def remove(self, value):
+        self._value.remove(value)
+        self._refresh_root()
+    
+    def symmetric_difference(self, other):
+        self._value.symmetric_difference(other)
+        self._refresh_root()
+    
+    def symmetric_difference_update(self, other):
+        self._value.symmetric_difference_update(other)
+        self._refresh_root()
+    
+    def union(self, *args):
+        return self._value.union(*args)
+    
+    def update(self, *args):
+        self._value.update(*args)
+        self._refresh_root()
+    
+    def _refresh_root(self):
+        self._root._set_node(
+            self._node, self._key_chain,
+            self._current_key, self._value
+        )
