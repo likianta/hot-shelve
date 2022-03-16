@@ -16,6 +16,15 @@ class T:
     
     Mutable = Union[dict, list, set]
     Immutable = Union[bool, bytes, int, float, str, tuple, None]
+    
+    
+def _is_nested_node(node) -> bool:
+    # node could be a dict or dict-like object (e.g. shelve).
+    return type(node) is not tuple
+
+
+def _is_ending_node(node) -> bool:
+    return type(node) is tuple
 
 
 class FlatShelve:
@@ -43,6 +52,10 @@ class FlatShelve:
         
         self._flat_db = shelve.open(self._file[:-3])
         self._key_map = shelve.open(self._file_map[:-3], writeback=True)  # noqa
+    
+    @property
+    def key_map(self) -> dict:
+        return dict(self._key_map)
     
     # -------------------------------------------------------------------------
     # dict-like behaviors
@@ -73,13 +86,13 @@ class FlatShelve:
         
         previous_key, current_key = self._rsplit_key(key)
         node, key_chain = self._locate_node(previous_key)
-        assert type(node) is dict
+        assert _is_nested_node(node)
         return self._get_node(node, key_chain, current_key, default)
     
     def setdefault(self, key: str, default=None):
         previous_key, current_key = self._rsplit_key(key)
         node, key_chain = self._locate_node(previous_key)
-        assert type(node) is dict
+        assert _is_nested_node(node)
         
         if current_key in node:
             return self._get_node(node, key_chain, current_key)
@@ -95,7 +108,7 @@ class FlatShelve:
     def pop(self, key: str, default=None):
         previous_key, current_key = self._rsplit_key(key)
         node, key_chain = self._locate_node(previous_key)
-        assert type(node) is dict
+        assert _is_nested_node(node)
         return self._pop_node(node, key_chain, current_key, default)
     
     def popitem(self):
@@ -122,7 +135,7 @@ class FlatShelve:
                 return True
             previous_key, current_key = key.rsplit('.', 1)
             node, _ = self._locate_node(previous_key)
-            assert type(node) is dict
+            assert _is_nested_node(node)
             return current_key in node
         else:
             return key in self._key_map
@@ -176,7 +189,7 @@ class FlatShelve:
         key_chain = key_chain + [key]
         flat_key = '.'.join(key_chain)
         
-        if type(node) is dict:
+        if _is_nested_node(node):
             return DictNode(self, node, key_chain, node)
         elif node[0] == 0:
             return self._flat_db[flat_key]
@@ -204,7 +217,7 @@ class FlatShelve:
     
     def _node_values(self, node: T.Node, key_chain: T.KeyChain):
         for key, value in node.items():
-            if isinstance(value, dict):
+            if _is_nested_node(value):
                 yield DictNode(self, value, key_chain + [key], value)
             elif value[0] == 0:
                 flat_key = '.'.join(key_chain + [key])
@@ -223,14 +236,14 @@ class FlatShelve:
     
     def _instantiate(self, node: T.Node, key_chain: T.KeyChain) -> dict | Any:
         
-        if type(node) is dict:
+        if _is_nested_node(node):
             if node:
                 out = {}
                 
                 def recurse(node_s: dict, node_t: dict):
                     for k, v in node_s.items():
                         key_chain.append(k)
-                        if type(v) is dict:
+                        if _is_nested_node(v):
                             next_node_t = node_t[k] = {}
                             recurse(v, next_node_t)
                         else:
@@ -262,14 +275,14 @@ class FlatShelve:
         if target_key is not None:
             node = node[target_key]
             key_chain.append(target_key)  # always keep sync with `node`.
-            if not isinstance(node, dict):
+            if _is_ending_node(node):
                 yield '.'.join(key_chain)
                 return
         
         def recurse(node: dict):
             for k, v in node.items():
                 key_chain.append(k)
-                if isinstance(v, dict):
+                if _is_nested_node(v):
                     yield from recurse(v)
                 else:
                     yield '.'.join(key_chain)
