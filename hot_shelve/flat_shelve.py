@@ -158,14 +158,18 @@ class FlatShelve:
             if isinstance(value, dict):
                 next_node = node[key] = {}
                 key_chain.append(key)  # temporarily sync with `next_node`.
-                for k, v in value.items():
-                    recurse(next_node, k, v)
+                if value:
+                    for k, v in value.items():
+                        recurse(next_node, k, v)
+                else:
+                    flat_key = '.'.join(key_chain)
+                    self._flat_db[flat_key] = {}
                 key_chain.pop()  # restore sync with `node`.
             
             else:
-                if isinstance(value, (list, set)):
+                if self._is_mutable(value):
                     node[key] = (1, type(value))
-                else:
+                else:  # immutable value
                     # # node[key] = (0, type(value))
                     node[key] = (0, None)
                     #   TODO: no need to store the immutable type in current
