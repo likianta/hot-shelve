@@ -1,9 +1,6 @@
-import json
 import shelve
-from os.path import exists
 from typing import Any
 from typing import Iterator
-from typing import TextIO
 from typing import Union
 
 
@@ -24,7 +21,6 @@ class T:
 class FlatShelve:
     _file: str
     _file_map: str
-    _file_map_handle: TextIO
     
     _flat_db: shelve.Shelf
     _key_map: dict
@@ -45,13 +41,8 @@ class FlatShelve:
         self._file = file
         self._file_map = file[:-3] + '.map.db'
         
-        self._flat_db = shelve.open(self._file)
-        if exists(self._file_map):
-            with open(self._file_map) as f:
-                self._key_map = json.load(f)
-        else:
-            self._key_map = {}
-        self._file_map_handle = open(self._file_map, 'w')
+        self._flat_db = shelve.open(self._file[:-3])
+        self._key_map = shelve.open(self._file_map[:-3], writeback=True)  # noqa
     
     # -------------------------------------------------------------------------
     # dict-like behaviors
@@ -314,7 +305,7 @@ class FlatShelve:
     
     def sync(self):
         self._flat_db.sync()
-        json.dump(self._key_map, self._file_map_handle)
+        self._key_map.sync()  # noqa
     
     def clear(self):
         self._flat_db.clear()
@@ -322,8 +313,7 @@ class FlatShelve:
     
     def close(self):
         self._flat_db.close()
-        json.dump(self._key_map, self._file_map_handle)
-        self._file_map_handle.close()
+        self._key_map.close()  # noqa
 
 
 # -----------------------------------------------------------------------------
