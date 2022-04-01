@@ -1,5 +1,6 @@
 /.idea/
 /deleted/
+/dist/
 /tests/test_db/*
 __pycache__/
 

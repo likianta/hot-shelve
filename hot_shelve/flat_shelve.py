@@ -16,8 +16,8 @@ class T:
     
     Mutable = Union[dict, list, set]
     Immutable = Union[bool, bytes, int, float, str, tuple, None]
-    
-    
+
+
 def _is_nested_node(node) -> bool:
     # node could be a dict or dict-like object (e.g. shelve).
     return type(node) is not tuple
@@ -238,7 +238,8 @@ class FlatShelve:
     def _node_items(self, node: T.Node, key_chain: T.KeyChain):
         return zip(node.keys(), self._node_values(node, key_chain))
     
-    def _instantiate(self, node: T.Node, key_chain: T.KeyChain) -> dict | Any:
+    def _instantiate(self, node: T.Node,
+                     key_chain: T.KeyChain) -> Union[dict, Any]:
         
         if _is_nested_node(node):
             if node:
@@ -346,6 +347,18 @@ class MutableNode:
         self._node = node
         self._key_chain = key_chain
         self._value = mutable
+    
+    def __bool__(self):
+        return bool(self._value)
+    
+    def __contains__(self, item):
+        return item in self._value
+
+    def __iter__(self):
+        return iter(self._value)
+
+    def __len__(self):
+        return len(self._value)
 
 
 # noinspection PyProtectedMember
@@ -427,6 +440,9 @@ class ListNode(MutableNode):
                  mutable: T.Mutable):
         super().__init__(root, parent_node, parent_key_chain, mutable)
         self._current_key = current_key
+    
+    def __getitem__(self, item):
+        return self._value[item]
     
     def append(self, value):
         self._value.append(value)
