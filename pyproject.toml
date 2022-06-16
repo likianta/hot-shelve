@@ -1,7 +1,9 @@
 [tool.poetry]
 name = "hot-shelve"
-version = "0.1.1"
+version = "0.1.2"
 description = "A wrapper for Python shelve that supports updating nested dictionaries in a simple way."
+readme = "README.md"
+homepage = "https://github.com/likianta/hot-shelve"
 authors = ["likianta <likianta@foxmail.com>"]
 license = "MIT"
 

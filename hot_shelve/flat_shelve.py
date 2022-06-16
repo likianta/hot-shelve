@@ -52,6 +52,10 @@ class FlatShelve:
         
         self._flat_db = shelve.open(self._file[:-3])
         self._key_map = shelve.open(self._file_map[:-3], writeback=True)  # noqa
+        
+        # related issue: https://bugs.python.org/issue42935
+        from atexit import register
+        register(self.close)
     
     @property
     def key_map(self) -> dict:
@@ -329,9 +333,14 @@ class FlatShelve:
         self._flat_db.clear()
         self._key_map.clear()
     
+    _is_closed = False
+    
     def close(self):
+        if self._is_closed:
+            return
         self._flat_db.close()
         self._key_map.close()  # noqa
+        self._is_closed = True
 
 
 # -----------------------------------------------------------------------------

@@ -4,4 +4,6 @@
 /tests/test_db/*
 __pycache__/
 
+.DS_Store
+
 !/tests/test_db/.gitkeep
