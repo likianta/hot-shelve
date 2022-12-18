@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hot-shelve"
-version = "0.2.0a0"
+version = "0.2.0b0"
 description = "A wrapper for Python shelve that supports updating nested dictionaries in a simple way."
 readme = "README.md"
 homepage = "https://github.com/likianta/hot-shelve"
@@ -13,5 +13,5 @@ python = "^3.8"
 [tool.poetry.dev-dependencies]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry"]
 build-backend = "poetry.core.masonry.api"

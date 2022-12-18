@@ -1,21 +1,19 @@
 import shelve
-from typing import Any
-from typing import Iterator
-from typing import Union
+import typing as t
 
 
 class T:
     Key = str  # e.g. 'a'
     FlatKey = str  # e.g. 'a.b.c'
-    Value = Any
+    Value = t.Any
     
-    Node = dict[Key, Value]
-    KeyChain = list[Key]
+    Node = t.Dict[Key, Value]
+    KeyChain = t.List[Key]
     #   KeyChain should be always sync with the level of Node.
     #   flat_key = '.'.join(key_chain)
     
-    Mutable = Union[dict, list, set]
-    Immutable = Union[bool, bytes, int, float, str, tuple, None]
+    Mutable = t.Union[dict, list, set]
+    Immutable = t.Union[bool, bytes, int, float, str, tuple, None]
 
 
 def _is_nested_node(node) -> bool:
@@ -242,8 +240,9 @@ class FlatShelve:
     def _node_items(self, node: T.Node, key_chain: T.KeyChain):
         return zip(node.keys(), self._node_values(node, key_chain))
     
-    def _instantiate(self, node: T.Node,
-                     key_chain: T.KeyChain) -> Union[dict, Any]:
+    def _instantiate(self,
+                     node: T.Node,
+                     key_chain: T.KeyChain) -> t.Union[dict, t.Any]:
         
         if _is_nested_node(node):
             if node:
@@ -278,7 +277,7 @@ class FlatShelve:
     @staticmethod
     def _collect_flat_keys(
             node: T.Node, key_chain: T.KeyChain, target_key=None
-    ) -> Iterator[T.FlatKey]:
+    ) -> t.Iterator[T.FlatKey]:
         key_chain = key_chain.copy()
         
         if target_key is not None:
@@ -303,13 +302,13 @@ class FlatShelve:
     # frequently used (private) methods
     
     @staticmethod
-    def _rsplit_key(key: T.Key) -> tuple[T.Key, T.Key]:
+    def _rsplit_key(key: T.Key) -> t.Tuple[T.Key, T.Key]:
         if '.' in key:
             return key.rsplit('.', 1)  # noqa
         else:
             return '', key
     
-    def _locate_node(self, key: T.Key) -> tuple[T.Node, T.KeyChain]:
+    def _locate_node(self, key: T.Key) -> t.Tuple[T.Node, T.KeyChain]:
         if not key:
             return self._key_map, []
         else:
@@ -362,10 +361,10 @@ class MutableNode:
     
     def __contains__(self, item):
         return item in self._value
-
+    
     def __iter__(self):
         return iter(self._value)
-
+    
     def __len__(self):
         return len(self._value)
 

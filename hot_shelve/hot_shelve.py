@@ -1,12 +1,13 @@
 import os
 import shelve
+import typing as t
 
 
 class HotShelve:
     # see `_init_hot_dict` for details.
-    _hot_key_chain: list[str]
-    _hot_lvl_chain: list[str]
-    _hot_map: dict[str, shelve.Shelf]
+    _hot_key_chain: t.List[str]
+    _hot_lvl_chain: t.List[str]
+    _hot_map: t.Dict[str, shelve.Shelf]
     
     def __init__(self, db_path: str, base_dict: dict):
         """
